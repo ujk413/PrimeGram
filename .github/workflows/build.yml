@@ -66,11 +66,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build
-        run: ./gradlew :TMessagesProj_App:assembleAfatDebug -Pprimegram.abis=arm64-v8a --no-daemon --stacktrace
+        run: ./gradlew :TMessagesProj_App:assembleAfatRelease -Pprimegram.abis=arm64-v8a --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PrimeGram-afat-debug
-          path: TMessagesProj_App/build/outputs/apk/afat/debug/*.apk
+          name: PrimeGram-afat-release
+          path: TMessagesProj_App/build/outputs/apk/afat/release/*.apk
           if-no-files-found: error
