@@ -20,18 +20,32 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Do not use android-actions/setup-android: it shells out to
+      # `sdkmanager tools`, and the `tools` package no longer exists in the
+      # modern SDK repository, so the action dies before the build starts.
+      # The runner already ships a full Android SDK, so we just point at it.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
         run: |
-          sdkmanager --install \
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "Using SDK at $SDK"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+
+          SDKMGR="$(find "$SDK/cmdline-tools" -name sdkmanager -type f | head -1)"
+          if [ -z "$SDKMGR" ]; then
+            echo "sdkmanager not found under $SDK" >&2
+            exit 1
+          fi
+          echo "Using $SDKMGR"
+          echo "$(dirname "$SDKMGR")" >> "$GITHUB_PATH"
+
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" --install \
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "ndk;27.2.12479018" \
             "cmake;3.22.1" \
             "platform-tools"
-          yes | sdkmanager --licenses > /dev/null || true
 
       - name: Point Gradle at the SDK
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
