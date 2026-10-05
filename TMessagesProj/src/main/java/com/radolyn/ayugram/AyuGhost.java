@@ -2,6 +2,7 @@ package com.radolyn.ayugram;
 
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.Vector;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stories;
 
@@ -61,13 +62,19 @@ public final class AyuGhost {
      * server would have returned so callers can cast it safely.
      */
     public static TLObject syntheticResponse(TLObject request) {
+        // The fabricated object must match the type the request's own
+        // deserializeResponse() would have produced, or the first caller that casts
+        // the response throws. Checked against each class in org.telegram.tgnet.
         if (request instanceof TLRPC.TL_messages_readHistory
-                || request instanceof TLRPC.TL_messages_readMessageContents
-                || request instanceof TLRPC.TL_channels_readMessageContents) {
+                || request instanceof TLRPC.TL_messages_readMessageContents) {
             return new TLRPC.TL_messages_affectedMessages();
         }
-        // channels.readHistory, messages.readDiscussion, stories.readStories and
-        // account.updateStatus all answer with a bare Bool.
+        if (request instanceof TL_stories.TL_stories_readStories) {
+            // stories.readStories answers with Vector<int>, not a Bool.
+            return new Vector<Vector.Int>(Vector.Int::TLDeserialize);
+        }
+        // channels.readHistory, channels.readMessageContents, messages.readDiscussion,
+        // stories.incrementStoryViews and account.updateStatus all answer with a bare Bool.
         return new TLRPC.TL_boolTrue();
     }
 

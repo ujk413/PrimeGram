@@ -18,7 +18,6 @@ import android.widget.Toast;
 import com.radolyn.ayugram.AyuConfig;
 import com.radolyn.ayugram.GhostMode;
 import com.radolyn.ayugram.database.AyuDatabase;
-import com.radolyn.ayugram.filters.AyuFilterController;
 
 /**
  * Standalone settings screen for the AyuGram feature set.
@@ -113,8 +112,20 @@ public class AyuGramPreferencesActivity extends Activity {
         });
 
         section("Storage");
-        info("Deleted messages retained: " + AyuDatabase.getInstance(account).getDeletedCount());
-        info("Edited revisions retained: " + AyuDatabase.getInstance(account).getEditedCount());
+        // The retention database lives on Telegram's storage thread; querying it inline
+        // here would stall the frame and race the retention writer, so the counts are
+        // filled in from a worker thread.
+        final TextView deletedInfo = info("Deleted messages retained: ...");
+        final TextView editedInfo = info("Edited revisions retained: ...");
+        final AyuDatabase database = AyuDatabase.getInstance(account);
+        new Thread(() -> {
+            final int deleted = database.getDeletedCount();
+            final int edited = database.getEditedCount();
+            runOnUiThread(() -> {
+                deletedInfo.setText("Deleted messages retained: " + deleted);
+                editedInfo.setText("Edited revisions retained: " + edited);
+            });
+        }, "ayugram-stats").start();
     }
 
     // ------------------------------------------------------------------ helpers
@@ -147,13 +158,14 @@ public class AyuGramPreferencesActivity extends Activity {
         content.addView(view);
     }
 
-    private void info(String text) {
+    private TextView info(String text) {
         final TextView view = new TextView(this);
         view.setText(text);
         view.setTextColor(Color.parseColor("#9a9a9a"));
         view.setTextSize(14);
         view.setPadding(0, dp(4), 0, dp(4));
         content.addView(view);
+        return view;
     }
 
     private void toggle(String title, boolean initial, OnToggle callback) {

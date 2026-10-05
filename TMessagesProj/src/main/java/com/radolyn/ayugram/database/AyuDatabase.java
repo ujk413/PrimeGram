@@ -38,9 +38,12 @@ import java.util.Map;
  * like {@code messages_v2.data}. Nothing is re-parsed on write, so a retained
  * message survives schema drift in the TL layer.
  *
- * <p><b>Threading.</b> Every method here must be called on Telegram's storage
- * thread ({@code MessagesStorage.getStorageQueue()}). The database handle is not
- * synchronized and must not be shared across threads.
+ * <p><b>Threading.</b> Retention writes happen on Telegram's storage thread
+ * ({@code MessagesStorage.getStorageQueue()}), but the read-only screens and
+ * {@code AyuFilterController} reach the same file from other threads, so every
+ * public method here is guarded by the instance monitor. That serialises access to
+ * the single native handle; it does not make a query on the UI thread cheap, so
+ * callers that touch this from an Activity must still move the call off-thread.
  */
 public final class AyuDatabase {
 
@@ -65,7 +68,7 @@ public final class AyuDatabase {
 
     // --------------------------------------------------------------- lifecycle
 
-    public void open() {
+    public synchronized void open() {
         if (opened) {
             return;
         }
@@ -78,6 +81,14 @@ public final class AyuDatabase {
                 FileLog.e("ayu: cannot create retention dir " + dir);
             }
             database = new SQLiteDatabase(new File(dir, "ayugram.db").getPath());
+            // AyuFilterController opens a second connection to this same file, and the
+            // read-only screens touch it from another thread. Without WAL plus a busy
+            // timeout those concurrent accesses fail with SQLITE_BUSY instead of waiting.
+            com.radolyn.ayugram.AyuConfig.load();
+            if (com.radolyn.ayugram.AyuConfig.walMode) {
+                database.executeFast("PRAGMA journal_mode = WAL").stepThis().dispose();
+            }
+            database.executeFast("PRAGMA busy_timeout = 3000").stepThis().dispose();
             createTables();
             opened = true;
         } catch (SQLiteException e) {
@@ -97,7 +108,7 @@ public final class AyuDatabase {
         database.executeFast("CREATE INDEX IF NOT EXISTS reactions_uid_idx ON deleted_reactions(uid, mid)").stepThis().dispose();
     }
 
-    public void close() {
+    public synchronized void close() {
         if (database != null) {
             database.close();
             database = null;
@@ -119,7 +130,7 @@ public final class AyuDatabase {
      * @param dialogId the dialog the messages belong to ({@code messages_v2.uid})
      * @param ids      message ids about to be erased
      */
-    public void retainDeleted(SQLiteDatabase source, long dialogId, ArrayList<Integer> ids) {
+    public synchronized void retainDeleted(SQLiteDatabase source, long dialogId, ArrayList<Integer> ids) {
         if (source == null || ids == null || ids.isEmpty()) {
             return;
         }
@@ -174,7 +185,7 @@ public final class AyuDatabase {
      * Stores one superseded revision of a message. Called for every edit, so a
      * message edited five times yields five rows, newest last.
      */
-    public void retainEdited(long dialogId, int mid, int date, NativeByteBuffer blob) {
+    public synchronized void retainEdited(long dialogId, int mid, int date, NativeByteBuffer blob) {
         if (blob == null) {
             return;
         }
@@ -205,17 +216,17 @@ public final class AyuDatabase {
     // ------------------------------------------------------------------ queries
 
     /** Raw retained blobs for a dialog, newest first. Caller deserializes. */
-    public ArrayList<RetainedMessage> getDeletedMessages(long dialogId, int limit) {
+    public synchronized ArrayList<RetainedMessage> getDeletedMessages(long dialogId, int limit) {
         return queryBlobs("deleted_messages", dialogId, limit);
     }
 
     /** Raw superseded blobs for a dialog, newest first. Caller deserializes. */
-    public ArrayList<RetainedMessage> getEditedMessages(long dialogId, int limit) {
+    public synchronized ArrayList<RetainedMessage> getEditedMessages(long dialogId, int limit) {
         return queryBlobs("edited_messages", dialogId, limit);
     }
 
     /** Every superseded revision of a single message, oldest first. */
-    public ArrayList<RetainedMessage> getEditsFor(int mid, long dialogId) {
+    public synchronized ArrayList<RetainedMessage> getEditsFor(int mid, long dialogId) {
         open();
         final ArrayList<RetainedMessage> result = new ArrayList<>();
         if (database == null) {
@@ -277,7 +288,7 @@ public final class AyuDatabase {
     }
 
     /** Wipes everything retained for this account. */
-    public void clear() {
+    public synchronized void clear() {
         open();
         if (database == null) {
             return;
@@ -292,11 +303,11 @@ public final class AyuDatabase {
     }
 
     /** Row counts, for the settings screen. */
-    public int getDeletedCount() {
+    public synchronized int getDeletedCount() {
         return count("deleted_messages");
     }
 
-    public int getEditedCount() {
+    public synchronized int getEditedCount() {
         return count("edited_messages");
     }
 

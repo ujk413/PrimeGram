@@ -37,11 +37,13 @@ public final class AyuHooks {
         }
         try {
             AyuConfig.load();
-            if (!AyuConfig.saveDeletedMessages) {
-                return;
-            }
             if (dialogId == 0) {
                 // dialogId 0 means the update carried no peer; cannot attribute the row
+                return;
+            }
+            // Goes through the helper rather than reading the raw flag so the
+            // "also save for bots" preference is actually honoured.
+            if (!AyuConfig.shouldSaveDeletedMessage(account, dialogId)) {
                 return;
             }
             AyuDatabaseHolder.get(account).retainDeleted(source, dialogId, ids);
@@ -57,7 +59,7 @@ public final class AyuHooks {
     public static void onMessageEdited(int account, long dialogId, int mid, int date, org.telegram.tgnet.NativeByteBuffer oldBlob) {
         try {
             AyuConfig.load();
-            if (!AyuConfig.saveMessagesHistory) {
+            if (!AyuConfig.shouldSaveEditedMessage(account, dialogId)) {
                 return;
             }
             AyuDatabaseHolder.get(account).retainEdited(dialogId, mid, date, oldBlob);

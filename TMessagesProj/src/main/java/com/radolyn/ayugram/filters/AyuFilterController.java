@@ -25,9 +25,10 @@ import java.util.regex.PatternSyntaxException;
  * applies to {@link Pattern}, so compiled patterns are memoised per filter id and
  * invalidated whenever the filter's regex changes.
  *
- * <p>Threading: reads and writes hit the database directly and must run on the
- * storage thread. {@link #matches(long, String, boolean)} is pure once the filter
- * list is loaded and may be called from anywhere.
+ * <p>Threading: the compiled-pattern and filter caches are shared mutable state, so
+ * every entry point here is guarded by the instance monitor and may be called from
+ * any thread. {@link #matches(long, String, boolean)} is pure once the filter list
+ * is loaded.
  */
 public final class AyuFilterController {
 
@@ -55,7 +56,7 @@ public final class AyuFilterController {
 
     // --------------------------------------------------------------- lifecycle
 
-    private void open() {
+    private synchronized void open() {
         if (opened) {
             return;
         }
@@ -68,6 +69,10 @@ public final class AyuFilterController {
                 FileLog.e("ayu: cannot create filters dir " + dir);
             }
             database = new SQLiteDatabase(new File(dir, "ayugram.db").getPath());
+            // Second connection to the same file the retention store writes to, so it
+            // needs the same WAL/busy-timeout treatment or concurrent access fails.
+            database.executeFast("PRAGMA journal_mode = WAL").stepThis().dispose();
+            database.executeFast("PRAGMA busy_timeout = 3000").stepThis().dispose();
             database.executeFast("CREATE TABLE IF NOT EXISTS filters(id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER, regex TEXT, text TEXT, enabled INTEGER, exclude_out INTEGER)").stepThis().dispose();
             database.executeFast("CREATE INDEX IF NOT EXISTS filters_uid_idx ON filters(uid)").stepThis().dispose();
             opened = true;
@@ -80,7 +85,7 @@ public final class AyuFilterController {
     // -------------------------------------------------------------------- CRUD
 
     /** All filters for a dialog, loading them on first use. */
-    public List<AyuFilter> getFilters(long dialogId) {
+    public synchronized List<AyuFilter> getFilters(long dialogId) {
         List<AyuFilter> list = cache.get(dialogId);
         if (list != null) {
             return list;
@@ -115,7 +120,7 @@ public final class AyuFilterController {
     }
 
     /** Inserts or updates a filter and drops any stale compiled pattern. */
-    public void saveFilter(AyuFilter filter) {
+    public synchronized void saveFilter(AyuFilter filter) {
         open();
         if (database == null) {
             return;
@@ -157,7 +162,7 @@ public final class AyuFilterController {
         invalidate(filter.dialogId);
     }
 
-    public void deleteFilter(AyuFilter filter) {
+    public synchronized void deleteFilter(AyuFilter filter) {
         open();
         if (database == null) {
             return;
@@ -184,7 +189,7 @@ public final class AyuFilterController {
      * @param text     the message text
      * @param outgoing whether the message is ours
      */
-    public boolean matches(long dialogId, String text, boolean outgoing) {
+    public synchronized boolean matches(long dialogId, String text, boolean outgoing) {
         if (TextUtils.isEmpty(text)) {
             return false;
         }

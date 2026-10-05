@@ -61,24 +61,28 @@ public class AyuMessageHistoryActivity extends Activity {
 
         header("Retained history");
 
+        // AyuDatabase is owned by Telegram's storage thread; reading it inline on the UI
+        // thread blocks the frame and races the retention writer. Query off-thread, build
+        // the views back on the main thread.
+        final TextView loading = empty("Loading...");
         final AyuDatabase database = AyuDatabase.getInstance(account);
-        final ArrayList<AyuDatabase.RetainedMessage> deleted = database.getDeletedMessages(dialogId, 500);
-        final ArrayList<AyuDatabase.RetainedMessage> edited = database.getEditedMessages(dialogId, 500);
+        new Thread(() -> {
+            final ArrayList<AyuDatabase.RetainedMessage> deleted = database.getDeletedMessages(dialogId, 500);
+            final ArrayList<AyuDatabase.RetainedMessage> edited = database.getEditedMessages(dialogId, 500);
+            runOnUiThread(() -> {
+                content.removeView(loading);
+                renderSection("Deleted messages", deleted);
+                renderSection("Edited messages", edited);
+            });
+        }, "ayugram-history").start();
+    }
 
-        section("Deleted messages (" + deleted.size() + ")");
-        if (deleted.isEmpty()) {
+    private void renderSection(String title, ArrayList<AyuDatabase.RetainedMessage> rows) {
+        section(title + " (" + rows.size() + ")");
+        if (rows.isEmpty()) {
             empty("Nothing retained yet.");
         } else {
-            for (AyuDatabase.RetainedMessage row : deleted) {
-                renderRow(row);
-            }
-        }
-
-        section("Edited messages (" + edited.size() + ")");
-        if (edited.isEmpty()) {
-            empty("Nothing retained yet.");
-        } else {
-            for (AyuDatabase.RetainedMessage row : edited) {
+            for (AyuDatabase.RetainedMessage row : rows) {
                 renderRow(row);
             }
         }
@@ -135,12 +139,13 @@ public class AyuMessageHistoryActivity extends Activity {
         content.addView(view);
     }
 
-    private void empty(String text) {
+    private TextView empty(String text) {
         final TextView view = new TextView(this);
         view.setText(text);
         view.setTextColor(Color.parseColor("#7a7a7a"));
         view.setTextSize(14);
         view.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         content.addView(view);
+        return view;
     }
 }
