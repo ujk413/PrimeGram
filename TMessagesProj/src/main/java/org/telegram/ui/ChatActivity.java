@@ -1247,6 +1247,10 @@ public class ChatActivity extends BaseFragment implements
 
     public final static int OPTION_VIEW_STATISTICS = 115;
     public final static int OPTION_WELCOME_REVERT = 116;
+    /** AyuGram: open the retained-messages viewer for this dialog. */
+    public final static int OPTION_AYU_HISTORY = 117;
+    /** AyuGram: open the filter manager for this dialog. */
+    public final static int OPTION_AYU_FILTERS = 118;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -8665,8 +8669,10 @@ public class ChatActivity extends BaseFragment implements
         chatScrollHelper.setAnimationCallback(chatScrollHelperCallback);
 
         flagSecure = new FlagSecureReason(getParentActivity().getWindow(), () ->
-            currentEncryptedChat != null ||
-            isPeerNoForwards()
+            !com.radolyn.ayugram.AyuHooks.shouldAllowScreenshots() && (
+                currentEncryptedChat != null ||
+                isPeerNoForwards()
+            )
         );
 
         if (oldMessage != null) {
@@ -20683,6 +20689,10 @@ public class ChatActivity extends BaseFragment implements
         loadsCount++;
         long did = (Long) args[0];
         int loadIndex = did == dialog_id ? 0 : 1;
+        if (loadIndex == 0 && mode == MODE_DEFAULT) {
+            // AyuGram: put the messages the server no longer has back into the list
+            com.radolyn.ayugram.AyuRetention.injectRetainedMessages(currentAccount, dialog_id, messArr, messagesDict[loadIndex]);
+        }
         int count = (Integer) args[1];
         int fnid = (Integer) args[4];
         int last_unread_date = (Integer) args[7];
@@ -33314,6 +33324,24 @@ public class ChatActivity extends BaseFragment implements
         }
         boolean preserveDim = false;
         switch (option) {
+            case OPTION_AYU_HISTORY: {
+                if (getParentActivity() != null) {
+                    android.content.Intent intent = new android.content.Intent(getParentActivity(), com.radolyn.ayugram.ui.AyuMessageHistoryActivity.class);
+                    intent.putExtra("account", currentAccount);
+                    intent.putExtra("dialog_id", dialog_id);
+                    getParentActivity().startActivity(intent);
+                }
+                break;
+            }
+            case OPTION_AYU_FILTERS: {
+                if (getParentActivity() != null) {
+                    android.content.Intent intent = new android.content.Intent(getParentActivity(), com.radolyn.ayugram.ui.AyuFiltersActivity.class);
+                    intent.putExtra("account", currentAccount);
+                    intent.putExtra("dialog_id", dialog_id);
+                    getParentActivity().startActivity(intent);
+                }
+                break;
+            }
             case OPTION_RETRY: {
                 final MessageObject object = selectedObject;
                 final MessageObject.GroupedMessages group = selectedObjectGroup;
@@ -37494,6 +37522,9 @@ public class ChatActivity extends BaseFragment implements
 
                 if (view instanceof ChatMessageCell) {
                     final ChatMessageCell messageCell = (ChatMessageCell) view;
+                    // AyuGram: retained messages are drawn dimmed; cells are recycled, so the
+                    // alpha has to be reset for everything else.
+                    messageCell.setAlpha(message.ayuDeleted && com.radolyn.ayugram.AyuConfig.semiTransparentDeletedMessages ? 0.7f : 1f);
                     MessageObject.GroupedMessages groupedMessages = getValidGroupedMessage(message);
                     messageCell.isChat = currentChat != null || UserObject.isUserSelf(currentUser) || UserObject.isReplyUser(currentUser) || (chatMode == MODE_SEARCH);
                     messageCell.setSponsoredMessageVisible(true, false);
@@ -46311,6 +46342,15 @@ public class ChatActivity extends BaseFragment implements
             options.add(OPTION_WELCOME_REVERT);
             icons.add(R.drawable.outline_revert_24);
         }
+
+        if (com.radolyn.ayugram.AyuRetention.hasRetainedMessages(currentAccount, dialog_id)) {
+            items.add(LocaleController.getString(R.string.AyuDeletedMessages));
+            options.add(OPTION_AYU_HISTORY);
+            icons.add(R.drawable.msg_delete);
+        }
+        items.add(LocaleController.getString(R.string.AyuMessageFilters));
+        options.add(OPTION_AYU_FILTERS);
+        icons.add(R.drawable.menu_tag_filter);
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {

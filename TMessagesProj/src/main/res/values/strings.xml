@@ -2,6 +2,8 @@
 <resources>
     <string name="AppName">PrimeGram</string>
     <string name="AppNameBeta">PrimeGram Beta</string>
+    <string name="AyuDeletedMessages">Deleted messages</string>
+    <string name="AyuMessageFilters">Message filters</string>
     <string name="LanguageName">English</string>
     <string name="English">English</string>
     <string name="LanguageNameInEnglish">English</string>

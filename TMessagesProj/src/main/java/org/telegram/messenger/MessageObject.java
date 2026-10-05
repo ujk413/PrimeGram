@@ -224,6 +224,8 @@ public class MessageObject {
     public String monthKey;
     public boolean deleted;
     public boolean deletedByThanos;
+    /** Set on messages reconstructed from the AyuGram retention store, i.e. ones the server no longer has. */
+    public boolean ayuDeleted;
     public float audioProgress;
     public float forceSeekTo = -1;
     public int audioProgressMs;

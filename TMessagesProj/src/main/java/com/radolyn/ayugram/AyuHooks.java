@@ -74,4 +74,55 @@ public final class AyuHooks {
             return com.radolyn.ayugram.database.AyuDatabase.getInstance(account);
         }
     }
+
+    // ------------------------------------------------------------------ misc flags
+
+    /**
+     * Whether the app should pretend the account has a subscription.
+     *
+     * <p>Port of desktop's {@code localPremium}: it unlocks the premium *interface*
+     * locally. Server-side features still need a real subscription and will be refused
+     * by Telegram, which is exactly how the desktop build behaves.
+     */
+    public static boolean shouldFakePremium() {
+        try {
+            AyuConfig.load();
+            return AyuConfig.localPremium;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether Telegram's sponsored messages must be suppressed.
+     *
+     * <p>Called from {@code MessagesController.getSponsoredMessages} — the single
+     * place a sponsored message object is built, so returning {@code true} there
+     * removes them from every surface that asks for them.
+     */
+    public static boolean shouldDisableAds() {
+        try {
+            AyuConfig.load();
+            return AyuConfig.disableAds;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether the content-protection window flags must be dropped, so screenshots
+     * of protected chats and no-forward content are allowed.
+     *
+     * <p>Called from the {@code FlagSecureReason} conditions in {@code ChatActivity},
+     * {@code ChatMessageCell} and {@code ProfileActivity}. The passcode screen keeps
+     * its own protection on purpose: this is about chat content, not the app lock.
+     */
+    public static boolean shouldAllowScreenshots() {
+        try {
+            AyuConfig.load();
+            return AyuConfig.showScreenshot;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 }

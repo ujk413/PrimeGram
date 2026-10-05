@@ -12100,7 +12100,9 @@ public class MessagesController extends BaseController implements NotificationCe
             message.dialog_id = dialogId;
             final MessageObject messageObject = new MessageObject(currentAccount, message, usersDict, chatsDict, true, false, mode == ChatActivity.MODE_SAVED);
             messageObject.scheduled = mode == 1;
-            objects.add(messageObject);
+            if (!com.radolyn.ayugram.AyuFilters.shouldHideMessage(currentAccount, dialogId, messageObject)) {
+                objects.add(messageObject);
+            }
             if (isCache) {
                 if (message.legacy && message.layer < TLRPC.LAYER) {
                     messagesToReload.add(message.id);
@@ -21610,6 +21612,10 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public SponsoredMessagesInfo getSponsoredMessages(long dialogId) {
+        if (com.radolyn.ayugram.AyuHooks.shouldDisableAds()) {
+            // never even ask the server for them
+            return null;
+        }
         SponsoredMessagesInfo info = sponsoredMessages.get(dialogId);
         if (info != null && (info.loading || Math.abs(SystemClock.elapsedRealtime() - info.loadTime) <= 5 * 60 * 1000)) {
             return info;

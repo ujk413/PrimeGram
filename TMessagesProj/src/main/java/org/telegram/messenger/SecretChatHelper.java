@@ -166,6 +166,11 @@ public class SecretChatHelper extends BaseController {
         if (!(encryptedChat instanceof TLRPC.TL_encryptedChat)) {
             return;
         }
+        if (resendMessage == null && com.radolyn.ayugram.AyuGhost.shouldSuppressSecretReadReceipt(currentAccount)) {
+            // ghost mode: the peer must not learn the messages were read. A resend is a
+            // retry of an already queued service message, so it still goes out.
+            return;
+        }
         TLRPC.TL_decryptedMessageService reqSend = new TLRPC.TL_decryptedMessageService();
         TLRPC.Message message;
 

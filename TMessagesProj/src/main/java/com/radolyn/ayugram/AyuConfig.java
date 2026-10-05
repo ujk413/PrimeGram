@@ -83,7 +83,11 @@ public final class AyuConfig {
     /** Master switch for regex / word filters. */
     public static boolean filtersEnabled = false;
 
-    /** Also apply filters inside open chats, not just in the dialog list. */
+    /**
+     * Apply filters to ordinary chats too. With this off, filters only take effect in
+     * broadcast channels — the desktop reference's
+     * {@code filtersEnabled && (filtersEnabledInChats || peer->isBroadcast())}.
+     */
     public static boolean regexFiltersInChats = false;
 
     /** Hide messages authored by blocked peers. */

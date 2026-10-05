@@ -12063,11 +12063,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             Window window = activity == null ? null : activity.getWindow();
             if (window != null) {
                 flagSecure = new FlagSecureReason(window, () ->
-                    currentMessageObject != null && currentMessageObject.messageOwner != null && (
-                        currentMessageObject.type == MessageObject.TYPE_PAID_MEDIA && (groupMedia == null || !groupMedia.hidden) ||
-                        currentMessageObject.messageOwner.noforwards && !currentMessageObject.isEphemeral() ||
-                        currentMessageObject.isVoiceOnce() ||
-                        currentMessageObject.hasRevealedExtendedMedia()
+                    !com.radolyn.ayugram.AyuHooks.shouldAllowScreenshots() && (
+                        currentMessageObject != null && currentMessageObject.messageOwner != null && (
+                            currentMessageObject.type == MessageObject.TYPE_PAID_MEDIA && (groupMedia == null || !groupMedia.hidden) ||
+                            currentMessageObject.messageOwner.noforwards && !currentMessageObject.isEphemeral() ||
+                            currentMessageObject.isVoiceOnce() ||
+                            currentMessageObject.hasRevealedExtendedMedia()
+                        )
                     )
                 );
                 if (attachedToWindow) {

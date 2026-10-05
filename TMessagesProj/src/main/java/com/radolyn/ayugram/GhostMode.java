@@ -50,7 +50,6 @@ public final class GhostMode {
     private boolean markReadAfterAction = true;
     private boolean useScheduledMessages = false;
     private SendWithoutSound sendWithoutSound = SendWithoutSound.NEVER;
-    private boolean suggestGhostModeBeforeViewingStory = true;
 
     private boolean sendReadMessagesLocked = false;
     private boolean sendReadStoriesLocked = false;
@@ -89,7 +88,6 @@ public final class GhostMode {
         useScheduledMessages = prefs.getBoolean(key("useScheduledMessages"), false);
         sendWithoutSound = SendWithoutSound.values()[
                 prefs.getInt(key("sendWithoutSound"), SendWithoutSound.NEVER.ordinal())];
-        suggestGhostModeBeforeViewingStory = prefs.getBoolean(key("suggestBeforeStory"), true);
 
         sendReadMessagesLocked = prefs.getBoolean(key("sendReadMessagesLocked"), false);
         sendReadStoriesLocked = prefs.getBoolean(key("sendReadStoriesLocked"), false);
@@ -147,23 +145,6 @@ public final class GhostMode {
         return sendWithoutSound;
     }
 
-    /** Whether the current send should be silenced, given the selected policy. */
-    public boolean shouldSendWithoutSound() {
-        switch (sendWithoutSound) {
-            case ALWAYS:
-                return true;
-            case IN_GHOST_MODE:
-                return ghostModeActive;
-            case NEVER:
-            default:
-                return false;
-        }
-    }
-
-    public boolean suggestGhostModeBeforeViewingStory() {
-        return suggestGhostModeBeforeViewingStory;
-    }
-
     // ------------------------------------------------------------- mutations
 
     public void setSendReadMessages(boolean value) {
@@ -206,9 +187,17 @@ public final class GhostMode {
         prefs.edit().putInt(key("sendWithoutSound"), value.ordinal()).apply();
     }
 
-    public void setSuggestGhostModeBeforeViewingStory(boolean value) {
-        suggestGhostModeBeforeViewingStory = value;
-        put("suggestBeforeStory", value);
+    /** Whether the current send should be silenced, given the selected policy. */
+    public boolean shouldSendWithoutSound() {
+        switch (sendWithoutSound) {
+            case ALWAYS:
+                return true;
+            case IN_GHOST_MODE:
+                return ghostModeActive;
+            case NEVER:
+            default:
+                return false;
+        }
     }
 
     // --------------------------------------------------------- locked overrides

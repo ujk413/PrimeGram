@@ -19,6 +19,8 @@ import com.radolyn.ayugram.AyuConfig;
 import com.radolyn.ayugram.GhostMode;
 import com.radolyn.ayugram.database.AyuDatabase;
 
+import org.telegram.messenger.MessagesController;
+
 /**
  * Standalone settings screen for the AyuGram feature set.
  *
@@ -77,7 +79,11 @@ public class AyuGramPreferencesActivity extends Activity {
         toggle("Send read receipts", ghost.sendReadMessages(), ghost::setSendReadMessages);
         toggle("Send read receipts for stories", ghost.sendReadStories(), ghost::setSendReadStories);
         toggle("Send online status", ghost.sendOnlinePackets(), ghost::setSendOnlinePackets);
-        toggle("Show upload progress", ghost.sendUploadProgress(), ghost::setSendUploadProgress);
+        toggle("Send offline packet anyway", ghost.sendOfflinePacketAfterOnline(), ghost::setSendOfflinePacketAfterOnline);
+        toggle("Send typing and upload progress", ghost.sendUploadProgress(), ghost::setSendUploadProgress);
+        toggle("Send messages as scheduled", ghost.useScheduledMessages(), ghost::setUseScheduledMessages);
+        toggle("Send messages without sound", ghost.sendWithoutSound() == GhostMode.SendWithoutSound.IN_GHOST_MODE, value ->
+                ghost.setSendWithoutSound(value ? GhostMode.SendWithoutSound.IN_GHOST_MODE : GhostMode.SendWithoutSound.NEVER));
 
         section("Filters");
         toggle("Enable filters", AyuConfig.filtersEnabled, value -> {
@@ -106,9 +112,12 @@ public class AyuGramPreferencesActivity extends Activity {
             AyuConfig.showScreenshot = value;
             AyuConfig.save();
         });
-        toggle("Keep retention service alive", AyuConfig.keepAliveService, value -> {
-            AyuConfig.keepAliveService = value;
-            AyuConfig.save();
+        toggle("Keep retention service alive", MessagesController.getMainSettings(account).getBoolean("keepAliveService", false), value -> {
+            // the app's own keep-alive switch: it is what keeps the process around long
+            // enough for deletions to be captured, so write the real setting rather than
+            // a private copy.
+            MessagesController.getInstance(account).keepAliveService = value;
+            MessagesController.getMainSettings(account).edit().putBoolean("keepAliveService", value).apply();
         });
 
         section("Storage");
