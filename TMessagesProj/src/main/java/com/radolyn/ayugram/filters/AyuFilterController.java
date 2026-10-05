@@ -71,7 +71,11 @@ public final class AyuFilterController {
             database = new SQLiteDatabase(new File(dir, "ayugram.db").getPath());
             // Second connection to the same file the retention store writes to, so it
             // needs the same WAL/busy-timeout treatment or concurrent access fails.
-            database.executeFast("PRAGMA journal_mode = WAL").stepThis().dispose();
+            // Mirrors AyuDatabase.open() so both connections agree on the journal mode.
+            com.radolyn.ayugram.AyuConfig.load();
+            if (com.radolyn.ayugram.AyuConfig.walMode) {
+                database.executeFast("PRAGMA journal_mode = WAL").stepThis().dispose();
+            }
             database.executeFast("PRAGMA busy_timeout = 3000").stepThis().dispose();
             database.executeFast("CREATE TABLE IF NOT EXISTS filters(id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER, regex TEXT, text TEXT, enabled INTEGER, exclude_out INTEGER)").stepThis().dispose();
             database.executeFast("CREATE INDEX IF NOT EXISTS filters_uid_idx ON filters(uid)").stepThis().dispose();
